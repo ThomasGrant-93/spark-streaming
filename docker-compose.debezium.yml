@@ -1,0 +1,35 @@
+services:
+  debezium:
+    image: quay.io/debezium/connect:2.5
+    ports:
+      - "8083:8083"
+    depends_on:
+      - kafka
+    environment:
+      GROUP_ID: 1
+      BOOTSTRAP_SERVERS: kafka:9092
+      CONFIG_STORAGE_TOPIC: "configuration.storage.topic"
+      OFFSET_STORAGE_TOPIC: "offset.storage.topic"
+      STATUS_STORAGE_TOPIC: "status.storage.topic"
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+
+      ENABLE_DEBEZIUM_SCRIPTING: true
+      ENABLE_DEBEZIUM_KC_REST_EXTENSION: true
+      CONNECT_REST_EXTENSION_CLASSES: io.debezium.kcrestextension.DebeziumConnectRestExtension,io.debezium.connector.postgresql.rest.DebeziumPostgresConnectRestExtension
+    healthcheck:
+      test:
+        [ 'CMD', 'curl', '--silent', '--fail', '-X', 'GET', 'http://localhost:8083/connectors', ]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  debezium-ui:
+    image: quay.io/debezium/debezium-ui:2.5
+    ports:
+      - "8081:8080"
+    environment:
+      KAFKA_CONNECT_URIS: http://debezium:8083
+    depends_on:
+      - debezium

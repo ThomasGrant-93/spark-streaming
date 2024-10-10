@@ -1,0 +1,117 @@
+x-spark-common:
+  &spark-common
+  image: docker.io/bitnami/spark:3.5
+  restart: on-failure
+  volumes:
+    - ./out/artifacts:/opt/bitnami/spark/apps
+  environment:
+    &spark-envs
+    SPARK_RPC_AUTHENTICATION_ENABLED: no
+    SPARK_RPC_ENCRYPTION_ENABLED: no
+    SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: no
+    SPARK_SSL_ENABLED: no
+    SPARK_USER: spark
+
+
+services:
+  zookeeper:
+    image: zookeeper:3.7.2
+    container_name: zookeeper
+    hostname: zookeeper
+    restart: on-failure
+    ports:
+      - '2181:2181'
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+    image: docker.io/bitnami/kafka:3.4.1
+    restart: on-failure
+    container_name: kafka
+    hostname: kafka
+    environment:
+      KAFKA_CFG_NODE_ID: 0
+      KAFKA_CFG_LISTENERS: PLAINTEXT1://:9092,PLAINTEXT2://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT1://kafka:9092,PLAINTEXT2://localhost:9093
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT1
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT1:PLAINTEXT,PLAINTEXT2:PLAINTEXT
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: true
+    healthcheck:
+      test: kafka-cluster.sh cluster-id --bootstrap-server localhost:9092 || exit 1
+      interval: 2m
+      start_period: 10s
+      timeout: 10s
+      retries: 3
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    depends_on:
+      zookeeper:
+        condition: service_started
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    hostname: kafka-ui
+    ports:
+      - "8082:8080"
+    environment:
+      DYNAMIC_CONFIG_ENABLED: true
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  cassandra:
+    image: docker.io/bitnami/cassandra:5.0.1
+    restart: on-failure
+    container_name: cassandra
+    hostname: cassandra
+    ports:
+      - "7000:7000"
+      - "9042:9042"
+    environment:
+      CASSANDRA_USER: cassandra
+      CASSANDRA_PASSWORD: cassandra
+    volumes:
+      - cassandra-data:/bitnami
+    healthcheck:
+      test: [ "CMD-SHELL", "nodetool", "status" ]
+      interval: 2m
+      start_period: 10s
+      timeout: 10s
+      retries: 3
+
+  spark-master:
+    <<: *spark-common
+    container_name: spark-master
+    hostname: spark-master
+    environment:
+      <<: *spark-envs
+      SPARK_MODE: master
+    ports:
+      - '8080:8080'
+      - '7077:7077'
+
+  spark-worker-a:
+    <<: *spark-common
+    container_name: spark-worker-a
+    hostname: spark-worker-a
+    environment:
+      <<: *spark-envs
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_WORKER_MEMORY: 1G
+      SPARK_WORKER_CORES: 4
+    depends_on:
+      spark-master:
+        condition: service_started
+
+
+volumes:
+  cassandra-data:
+    driver: local
+  kafka-data:
+    driver: local
