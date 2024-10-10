@@ -129,42 +129,6 @@ consumerConfig {
 
 Для логирования и отладки используется Log4j. Настройки находятся в `log4j.properties`.
 
-## Пример `build.sbt`
-
-Файл `build.sbt` содержит все необходимые зависимости и настройки:
-
-```scala
-ThisBuild / version := "0.1.0-SNAPSHOT"
-ThisBuild / scalaVersion := "2.13.15"
-
-val sparkVersion = "3.5.3"
-
-lazy val root = (project in file("."))
-        .settings(
-            name := "spark-streaming",
-            libraryDependencies ++= Seq(
-                "com.typesafe" % "config" % "1.4.3",
-                "com.google.code.gson" % "gson" % "2.10.1",
-                "org.apache.kafka" % "kafka-clients" % "3.8.0",
-                "org.apache.spark" %% "spark-core" % sparkVersion,
-                "org.apache.spark" %% "spark-sql" % sparkVersion,
-                "org.apache.spark" %% "spark-sql-kafka-0-10" % sparkVersion,
-                "com.datastax.spark" %% "spark-cassandra-connector" % "3.5.1"
-            ),
-            libraryDependencySchemes += "com.github.luben" % "zstd-jni" % VersionScheme.Always,
-            fork := true,
-            javaOptions ++= Seq(
-                "-Xmx4G",
-                "-XX:+UseG1GC",
-                "-Dlog4j.configurationFile=log4j.properties"
-            ),
-            Compile / run / mainClass := Some("SparkKafkaConsumer"),
-            dependencyOverrides ++= Set(
-                "com.google.guava" % "guava" % "31.1-jre"
-            )
-        )
-```
-
 ## Лицензия
 
 Проект лицензирован под MIT License.
