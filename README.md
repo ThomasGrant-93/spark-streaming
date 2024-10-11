@@ -100,35 +100,41 @@ sbt "runMain SparkKafkaConsumer"
 Файл `application.conf` должен содержать параметры подключения:
 
 ```hocon
-kafkaConfig {
-  bootstrapServers = "localhost:9092"
-  topic = "your_topic"
-  startingOffsets = "latest"
-}
-
-cassandraConfig {
-  host = "localhost"
-  port = 9042
-  keyspace = "your_keyspace"
-  table = "your_table"
-  user = "cassandra"
-  pass = "cassandra"
-}
-
-sparkConfig {
-  name = "SparkKafkaConsumer"
-  master = "local[*]"
-}
-
-consumerConfig {
-  triggerInterval = "10 seconds"
+app {
+  name = "Spark"
+  version = "1.0.0"
+  spark {
+    consumer {
+      master = "local[*]"
+      name = "Spark:Consumer"
+      interval = "10 seconds"
+    }
+  }
+  cassandra {
+    host = "YOUR_CASSANDRA_HOST"
+    port = "9042"
+    keyspace = "stuff"
+    table = "weather"
+    user = "cassandra"
+    pass = "cassandra"
+  }
+  database {
+    host = "YOUR_DATABASE_HOST"
+    port = "YOUR_DATABASE_PORT"
+    db = "db"
+    user = "edw_admin_user"
+    pass = "edw_admin_user"
+  }
+  kafka {
+    host = "YOUR_KAFKA_HOST"
+    port = "9093"
+    topic = "weather"
+    checkpoint = "/tmp/kafka-checkpoints"
+    offset = "earliest"
+  }
 }
 ```
 
 ## Логи и отладка
 
 Для логирования и отладки используется Log4j. Настройки находятся в `log4j.properties`.
-
-## Лицензия
-
-Проект лицензирован под MIT License.
