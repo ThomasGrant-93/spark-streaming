@@ -6,7 +6,7 @@ import org.apache.log4j.Logger
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
-import org.apache.spark.sql.types.{DoubleType, StringType, StructType, TimestampType}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 class SparkKafkaConsumer(
@@ -19,16 +19,22 @@ class SparkKafkaConsumer(
   @transient private val logger: Logger = Logger.getLogger(getClass.getName)
 
   private def createSparkSession(): SparkSession = {
-    SparkSession.builder()
+    val cassConfigsMap = Map(
+      "spark.cassandra.connection.host" -> cassandraConfig.host,
+      "spark.cassandra.connection.port" -> cassandraConfig.port,
+      "spark.cassandra.auth.username" -> cassandraConfig.user,
+      "spark.cassandra.auth.password" -> cassandraConfig.pass,
+      "spark.cassandra.output.consistency.level" -> "LOCAL_QUORUM"
+    )
+
+    val builder = SparkSession.builder()
       .appName(sparkConfig.name)
       .master(sparkConfig.master)
       .config("spark.streaming.stopGracefullyOnShutdown", "true")
-      .config("spark.cassandra.connection.host", cassandraConfig.host)
-      .config("spark.cassandra.connection.port", cassandraConfig.port)
-      .config("spark.cassandra.auth.username", cassandraConfig.user)
-      .config("spark.cassandra.auth.password", cassandraConfig.pass)
-      .config("spark.cassandra.output.consistency.level", "LOCAL_QUORUM")
-      .getOrCreate()
+
+    cassConfigsMap.foreach { case (key, value) => builder.config(key, value) }
+
+    builder.getOrCreate()
   }
 
   private def createKafkaStream(spark: SparkSession): DataFrame = {
@@ -45,24 +51,26 @@ class SparkKafkaConsumer(
   }
 
   private def parseKafkaMessages(kafkaStreamDF: DataFrame): DataFrame = {
-    val jsonSchema = new StructType()
-      .add("timestamp", DoubleType, nullable = false)
-      .add("device", StringType, nullable = false)
-      .add("temp", DoubleType, nullable = false)
-      .add("humd", DoubleType, nullable = false)
-      .add("pres", DoubleType, nullable = false)
+    val jsonSchema = StructType(
+      Seq(
+        StructField("timestamp", DoubleType, nullable = false),
+        StructField("device", StringType, nullable = false),
+        StructField("temp", DoubleType, nullable = false),
+        StructField("humd", DoubleType, nullable = false),
+        StructField("pres", DoubleType, nullable = false)
+      )
+    )
 
     logger.info(s"Step 2 parseKafkaMessages")
 
     kafkaStreamDF
-      .withColumn("valueString", col("value").cast("string"))
-      .select(from_json(col("valueString"), jsonSchema).as("data"))
+      .select(from_json(col("value").cast("string"), jsonSchema).as("json"))
       .select(
-        from_unixtime(col("data.timestamp")).cast(TimestampType).as("timestamp"),
-        col("data.device"),
-        col("data.temp"),
-        col("data.humd"),
-        col("data.pres")
+        from_unixtime(col("json.timestamp")).cast(TimestampType).as("timestamp"),
+        col("json.device"),
+        col("json.temp"),
+        col("json.humd"),
+        col("json.pres")
       )
   }
 
@@ -100,8 +108,8 @@ class SparkKafkaConsumer(
     val spark = createSparkSession()
 
     try {
-      logger.debug(s"${getClass.getName} running with args: ${args.mkString(", ")}")
-      logger.debug(s"Spark Kafka consumer startup in ${System.currentTimeMillis()}")
+      logger.info(s"${getClass.getName} running with args: ${args.mkString(", ")}")
+      logger.info(s"Spark Kafka consumer startup in ${System.currentTimeMillis()}")
 
       val kafkaStreamDF = createKafkaStream(spark)
       val eventsDF = parseKafkaMessages(kafkaStreamDF)
@@ -120,8 +128,8 @@ class SparkKafkaConsumer(
               .save()
             logger.info(s"Writing success $batchID")
           } catch {
-            case e: Exception =>
-              logger.error(s"Error writing batch $batchID to Cassandra", e)
+            case ex: Exception =>
+              logger.error(s"Error writing batch $batchID to Cassandra", ex)
           }
         }
         .trigger(Trigger.ProcessingTime(consumerConfig.triggerInterval))
@@ -131,8 +139,8 @@ class SparkKafkaConsumer(
       query.awaitTermination()
 
     } catch {
-      case e: Exception =>
-        logger.error("Error in Spark Kafka Consumer", e)
+      case ex: Exception =>
+        logger.error("Error in Spark Kafka Consumer", ex)
     } finally {
       logger.debug(s"Spark Kafka consumer shutdown in ${System.currentTimeMillis()}")
       spark.stop()
