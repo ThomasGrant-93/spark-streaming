@@ -1,0 +1,8 @@
+# Set Unix-style line endings for all text files
+* text=auto
+*.sh eol=lf
+*.scala eol=lf
+*.yml eol=lf
+*.conf eol=lf
+*.md eol=lf
+*.properties eol=lf
