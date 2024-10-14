@@ -2,7 +2,11 @@ package com.stream.spark.configuration
 
 import com.typesafe.config.Config
 
-case class ConsumerConfig(master: String, name: String, interval: String) {
+final case class ConsumerConfig(
+                                 master: String,
+                                 name: String,
+                                 interval: String
+                               ) {
   def appName: String = name
 
   def triggerInterval: String = interval

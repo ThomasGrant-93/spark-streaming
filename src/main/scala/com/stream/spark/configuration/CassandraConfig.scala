@@ -2,14 +2,14 @@ package com.stream.spark.configuration
 
 import com.typesafe.config.Config
 
-case class CassandraConfig(
-                            user: String,
-                            pass: String,
-                            host: String,
-                            port: String,
-                            keyspace: String,
-                            table: String
-                          ) {}
+final case class CassandraConfig(
+                                  user: String,
+                                  pass: String,
+                                  host: String,
+                                  port: String,
+                                  keyspace: String,
+                                  table: String
+                                ) {}
 
 object CassandraConfig {
   def apply(config: Config): CassandraConfig = {
